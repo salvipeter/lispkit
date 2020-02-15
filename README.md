@@ -3,7 +3,7 @@
 A Scheme implementation of the SECD virtual machine, and a LispKit Lisp compiler, based on
 P. Henderson's Functional Programming - Application and Implementation.
 
-First generate the compiler bytecode:
+First generate the compiler bytecode (you only need to do this once):
 
 ```scheme
 > (load "bootstrap.scm")
