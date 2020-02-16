@@ -15,42 +15,44 @@
 (load "secd.scm")
 
 (define (lispkit-compile e)
-  (comp e '() '(4 21)))
+  (comp e '() '(4 21)))                 ; compiled bytecode ends with AP STOP
 
 (define (comp e n c)
-  (if (not (pair? e)) (cons 1 (cons (location e n) c))
+  (if (not (pair? e)) (cons 1 (cons (location e n) c))                          ; LD (i.j)
       (case (car e)
-        ((QUOTE) (cons 2 (cons (cadr e) c)))
-        ((ADD) (comp (cadr e) n (comp (caddr e) n (cons 15 c))))
-        ((SUB) (comp (cadr e) n (comp (caddr e) n (cons 16 c))))
-        ((MUL) (comp (cadr e) n (comp (caddr e) n (cons 17 c))))
-        ((DIV) (comp (cadr e) n (comp (caddr e) n (cons 18 c))))
-        ((REM) (comp (cadr e) n (comp (caddr e) n (cons 19 c))))
-        ((LEQ) (comp (cadr e) n (comp (caddr e) n (cons 20 c))))
-        ((EQ)  (comp (cadr e) n (comp (caddr e) n (cons 14 c))))
-        ((CAR) (comp (cadr e) n (cons 10 c)))
-        ((CDR) (comp (cadr e) n (cons 11 c)))
-        ((ATOM) (comp (cadr e) n (cons 12 c)))
-        ((CONS) (comp (caddr e) n (comp (cadr e) n (cons 13 c))))
-        ((IF) (let ((thenpt (comp (caddr e) n '(9)))
-                    (elsept (comp (cadddr e) n '(9))))
+        ((QUOTE) (cons 2 (cons (cadr e) c)))                                    ; LDC s
+        ((ADD) (comp (cadr e) n (comp (caddr e) n (cons 15 c))))                ; e1 e2 ADD
+        ((SUB) (comp (cadr e) n (comp (caddr e) n (cons 16 c))))                ; e1 e2 SUB
+        ((MUL) (comp (cadr e) n (comp (caddr e) n (cons 17 c))))                ; e1 e2 MUL
+        ((DIV) (comp (cadr e) n (comp (caddr e) n (cons 18 c))))                ; e1 e2 DIV
+        ((REM) (comp (cadr e) n (comp (caddr e) n (cons 19 c))))                ; e1 e2 REM
+        ((LEQ) (comp (cadr e) n (comp (caddr e) n (cons 20 c))))                ; e1 e2 LEQ
+        ((EQ)  (comp (cadr e) n (comp (caddr e) n (cons 14 c))))                ; e1 e2 EQ
+        ((CAR) (comp (cadr e) n (cons 10 c)))                                   ; e CAR
+        ((CDR) (comp (cadr e) n (cons 11 c)))                                   ; e CDR
+        ((ATOM) (comp (cadr e) n (cons 12 c)))                                  ; e ATOM
+        ((CONS) (comp (caddr e) n (comp (cadr e) n (cons 13 c))))               ; e2 e1 CONS
+        ((IF) (let ((thenpt (comp (caddr e) n '(9)))                            ; e1 (SEL (e2 JOIN)
+                    (elsept (comp (cadddr e) n '(9))))                          ;         (e3 JOIN))
                 (comp (cadr e) n (cons 8 (cons thenpt (cons elsept c))))))
-        ((LAMBDA) (let ((body (comp (caddr e) (cons (cadr e) n) '(5))))
-                    (cons 3 (cons body c))))
-        ((LET) (let ((m (cons (vars (cddr e)) n))
+        ((LAMBDA) (let ((body (comp (caddr e) (cons (cadr e) n) '(5))))         ; LDF (e RTN)
+                    (cons 3 (cons body c))))                                    ; (w/extended env.)
+        ((LET) (let ((m (cons (vars (cddr e)) n))                               ; = LAMBDA + appl.
                      (args (exprs (cddr e))))
                  (let ((body (comp (cadr e) m '(5))))
                    (complis args n (cons 3 (cons body (cons 4 c)))))))
-        ((LETREC) (let ((m (cons (vars (cddr e)) n))
-                        (args (exprs (cddr e))))
-                    (let ((body (comp (cadr e) m '(5))))
+        ((LETREC) (let ((m (cons (vars (cddr e)) n))                            ; = LET, but
+                        (args (exprs (cddr e))))                                ; starts with DUM
+                    (let ((body (comp (cadr e) m '(5))))                        ; and uses RAP
                       (cons 6 (complis args m (cons 3 (cons body (cons 7 c))))))))
+        ; application: LDC NIL ek CONS ek-1 CONS ... e1 CONS e AP
         (else (complis (cdr e) n (comp (car e) n (cons 4 c)))))))
 
+;;; Builds the argument list for function application
 (define (complis e n c)
   (if (null? e)
-      (cons 2 (cons 'NIL c))
-      (complis (cdr e) n (comp (car e) n (cons 13 c)))))
+      (cons 2 (cons 'NIL c))                                ; LDC NIL
+      (complis (cdr e) n (comp (car e) n (cons 13 c)))))    ; ek CONS
 
 ;;; finds (i . j), where i is the index of the environment,
 ;;; and j is the index of the variable inside the i-th environment,
