@@ -148,6 +148,10 @@
        (IF (EQ D (QUOTE NIL)) (QUOTE NIL)
            (CONS (CDR (CAR D)) (EXPRS (CDR D)))))))
 
+(with-output-to-file "bootstrap.lkc"
+	(lambda ()
+		(write (lispkit-compile compiler))))
+
 (let ((bootstrap (lispkit-compile compiler)))
   (with-output-to-file "lispkit.lkc"
     (lambda ()

@@ -1,2 +1,5 @@
 *~
 *.lkc
+*.lkl
+*.o
+secd
