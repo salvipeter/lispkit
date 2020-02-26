@@ -8,7 +8,7 @@
 // Section 11.8
 
 Data *exec(Data *fn, Data *args) {
-  Data *s = cons(args, &nil), *e = &nil, *c = fn, *d = &nil, *w;
+  Data *s = cons(args, nil), *e = nil, *c = fn, *d = nil, *w;
   bool stop = false;
   while (!stop) {
     switch (ivalue(car(c))) {
@@ -35,7 +35,7 @@ Data *exec(Data *fn, Data *args) {
       d = cons(cdr(cdr(s)), cons(e, cons(cdr(c), d)));
       e = cons(car(cdr(s)), cdr(car(s)));
       c = car(car(s));
-      s = &nil;
+      s = nil;
       break;
     case 5:  // RTN
       s = cons(car(s), car(d));
@@ -44,7 +44,7 @@ Data *exec(Data *fn, Data *args) {
       d = cdr(cdr(cdr(d)));
       break;
     case 6:  // DUM
-      e = cons(&nil, e);
+      e = cons(nil, e);
       c = cdr(c);
       break;
     case 7:  // RAP
@@ -52,7 +52,7 @@ Data *exec(Data *fn, Data *args) {
       e = cdr(car(s));
       rplaca(e, car(cdr(s)));
       c = car(car(s));
-      s = &nil;
+      s = nil;
       break;
     case 8:  // SEL
       d = cons(cdr(cdr(cdr(c))), d);
@@ -76,9 +76,9 @@ Data *exec(Data *fn, Data *args) {
       break;
     case 12: // ATOM
       if (isnumber(car(s)) || issymbol(car(s)))
-        s = cons(&bool_t, cdr(s));
+        s = cons(bool_t, cdr(s));
       else
-        s = cons(&bool_f, cdr(s));
+        s = cons(bool_f, cdr(s));
       c = cdr(c);
       break;
     case 13: // CONS
@@ -88,9 +88,9 @@ Data *exec(Data *fn, Data *args) {
     case 14: // EQ
       if ((issymbol(car(s)) && issymbol(car(cdr(s))) && svalue(car(s)) == svalue(car(cdr(s)))) ||
           (isnumber(car(s)) && isnumber(car(cdr(s))) && ivalue(car(s)) == ivalue(car(cdr(s)))))
-        s = cons(&bool_t, cdr(cdr(s)));
+        s = cons(bool_t, cdr(cdr(s)));
       else
-        s = cons(&bool_f, cdr(cdr(s)));
+        s = cons(bool_f, cdr(cdr(s)));
       c = cdr(c);
       break;
     case 15: // ADD
@@ -115,9 +115,9 @@ Data *exec(Data *fn, Data *args) {
       break;
     case 20: // LEQ
       if (ivalue(car(cdr(s))) <= ivalue(car(s)))
-        s = cons(&bool_t, cdr(cdr(s)));
+        s = cons(bool_t, cdr(cdr(s)));
       else
-        s = cons(&bool_f, cdr(cdr(s)));
+        s = cons(bool_f, cdr(cdr(s)));
       c = cdr(c);
       break;
     case 21: // STOP
@@ -134,6 +134,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  // Section 11.2
   std::ifstream f_fn(argv[1]), f_args(argv[2]);
   f_fn.exceptions(std::ios::failbit | std::ios::badbit);
   f_args.exceptions(std::ios::failbit | std::ios::badbit);

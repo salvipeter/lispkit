@@ -33,16 +33,13 @@ Data *getexplist(std::istream &is, Data *next_car) {
     gettoken(is);               // read also the final ')'
   }
   else if (token.type == TokenType::ENDFILE || token.value == ")")
-    cdr = &nil;
+    cdr = nil;
   else {
     auto next = getexp(token, is);
     cdr = getexplist(is, next);
   }
   return cons(car, cdr);
 }
-
-
-// Section 11.4
 
 Token gettoken(std::istream &is) {
   is >> std::ws;
@@ -75,9 +72,6 @@ Token gettoken(std::istream &is) {
   return { TokenType::DELIMITER, { c } };
 }
 
-
-// Section 11.5
-
 // There are only 3 cases when we do not want space before printing something:
 // - it is the first thing we print
 // - it is immediately after a '('
@@ -96,7 +90,7 @@ void putexp(Data *e, std::ostream &os) {
       if (iscons(p))
         os << ' ';
     }
-    if (p != &nil) {
+    if (p != nil) {
       os << " . ";
       putexp(p, os);
     }

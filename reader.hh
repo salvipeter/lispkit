@@ -16,6 +16,6 @@ struct Token {
 Data *getexp(const Token &token);
 Data *getexp(std::istream &is);
 Data *getexplist(std::istream &is, Data *next_car = nullptr);
-void putexp(Data *e, std::ostream &os);
+void putexp(Data *e, std::ostream &os); // Section 11.5
 
-Token gettoken(std::istream &is);
+Token gettoken(std::istream &is); // Section 11.4

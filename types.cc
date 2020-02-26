@@ -1,7 +1,33 @@
 #include "types.hh"
 
+enum class DataType { SYMBOL, NUMBER, CONS };
+
+struct Data {
+  Data(DataType type) : type(type) { }
+  virtual ~Data() { }
+  DataType type;
+};
+
+struct Symbol : public Data {
+  Symbol(std::string svalue) : Data(DataType::SYMBOL), svalue(svalue) { }
+  ~Symbol() { }
+  std::string svalue;
+};
+
+struct Number : public Data {
+  Number(int ivalue) : Data(DataType::NUMBER), ivalue(ivalue) { }
+  ~Number()  { }
+  int ivalue;
+};
+
+struct Cons : public Data {
+  Cons(Data *car, Data *cdr) : Data(DataType::CONS), car(car), cdr(cdr) { }
+  ~Cons() { dispose(car); dispose(cdr); }
+  Data *car, *cdr;
+};
+
 void dispose(Data *d) {
-  if (d != &nil && d != &bool_t && d != &bool_f)
+  if (d != nil && d != bool_t && d != bool_f)
     delete d;
 }
 
@@ -49,5 +75,5 @@ void rplaca(Data *c, Data *d) {
   dynamic_cast<Cons*>(c)->car = d;
 }
 
-Symbol nil("NIL");
-Symbol bool_t("T"), bool_f("F");
+Symbol nil_symbol("NIL"), bool_t_symbol("T"), bool_f_symbol("F");
+Data *nil = &nil_symbol, *bool_t = &bool_t_symbol, *bool_f = &bool_f_symbol;
