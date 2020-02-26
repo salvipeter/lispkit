@@ -9,12 +9,6 @@ enum class DataType { SYMBOL, NUMBER, CONS };
 struct Data {
   Data(DataType type) : type(type) { }
   virtual ~Data() { }
-
-  bool issymbol();
-  bool isnumber();
-  bool iscons();
-
-private:
   DataType type;
 };
 
@@ -27,6 +21,7 @@ struct Symbol : public Data {
 };
 
 extern Symbol nil;
+extern Symbol bool_t, bool_f; // Section 11.8
 
 struct Number : public Data {
   Number(int ivalue) : Data(DataType::NUMBER), ivalue(ivalue) { }
@@ -39,3 +34,19 @@ struct Cons : public Data {
   ~Cons() { dispose(car); dispose(cdr); }
   Data *car, *cdr;
 };
+
+// Simple interface
+
+Data *symbol(std::string s);
+Data *number(int n);
+Data *cons(Data *a, Data *b);
+
+bool issymbol(Data *d);
+bool isnumber(Data *d);
+bool iscons(Data *d);
+
+std::string svalue(Data *d);
+int ivalue(Data *d);
+Data *car(Data *d);
+Data *cdr(Data *d);
+void rplaca(Data *c, Data *d);

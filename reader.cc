@@ -5,9 +5,9 @@
 Data *getexp(const Token &token, std::istream &is) {
   switch (token.type) {
   case TokenType::NUMERIC:
-    return new Number(std::atoi(token.value.c_str()));
+    return number(std::atoi(token.value.c_str()));
   case TokenType::ALPHANUMERIC:
-    return new Symbol(token.value);
+    return symbol(token.value);
   case TokenType::DELIMITER:    // should be "("
     return getexplist(is);
   case TokenType::ENDFILE:
@@ -32,13 +32,13 @@ Data *getexplist(std::istream &is, Data *next_car) {
     cdr = getexp(is);
     gettoken(is);               // read also the final ')'
   }
-  else if (token.value == ")")
+  else if (token.type == TokenType::ENDFILE || token.value == ")")
     cdr = &nil;
   else {
     auto next = getexp(token, is);
     cdr = getexplist(is, next);
   }
-  return new Cons(car, cdr);
+  return cons(car, cdr);
 }
 
 
@@ -83,17 +83,17 @@ Token gettoken(std::istream &is) {
 // - it is immediately after a '('
 // - it is a ')'
 void putexp(Data *e, std::ostream &os) {
-  if (e->issymbol())
-    os << dynamic_cast<Symbol*>(e)->svalue;
-  else if (e->isnumber())
-    os << dynamic_cast<Number*>(e)->ivalue;
+  if (issymbol(e))
+    os << svalue(e);
+  else if (isnumber(e))
+    os << ivalue(e);
   else {
     os << '(';
     auto p = e;
-    while (p->iscons()) {
-      putexp(dynamic_cast<Cons*>(p)->car, os);
-      p = dynamic_cast<Cons*>(p)->cdr;
-      if (p->iscons())
+    while (iscons(p)) {
+      putexp(car(p), os);
+      p = cdr(p);
+      if (iscons(p))
         os << ' ';
     }
     if (p != &nil) {
