@@ -9,8 +9,8 @@
 enum class TokenType { ALPHANUMERIC, NUMERIC, DELIMITER, ENDFILE };
 
 struct Token {
-	TokenType type;
-	std::string value;
+  TokenType type;
+  std::string value;
 };
 
 Data *getexp(const Token &token);
