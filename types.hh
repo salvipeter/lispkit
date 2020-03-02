@@ -23,4 +23,5 @@ Data *car(Data *d);
 Data *cdr(Data *d);
 void rplaca(Data *c, Data *d);
 
-void dispose(Data *d);
+void initialize(size_t size);
+void shutdown();

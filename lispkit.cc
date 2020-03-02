@@ -9,6 +9,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  initialize(10000);
+
   // Section 11.2
   std::ifstream f_fn(argv[1]), f_args(argv[2]);
   f_fn.exceptions(std::ios::failbit | std::ios::badbit);
@@ -17,4 +19,6 @@ int main(int argc, char **argv) {
   Data *result = exec(fn, args);
   putexp(result, std::cout);
   std::cout << std::endl;
+
+  shutdown();
 }

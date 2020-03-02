@@ -1,46 +1,85 @@
 #include "types.hh"
 
+#include <algorithm>
+#include <stdexcept>
+#include <vector>
+
 enum class DataType { SYMBOL, NUMBER, CONS };
 
 struct Data {
-  Data(DataType type) : type(type) { }
-  virtual ~Data() { }
+  Data(size_t s) : type(DataType::SYMBOL), svalue(s) { }
+  Data(Data *a, Data *b) : type(DataType::CONS), cadr({ a, b }) { }
+  ~Data() { }
+
   DataType type;
+  union {
+    size_t svalue;
+    int ivalue;
+    std::pair <Data *, Data *> cadr;
+  };
 };
 
-struct Symbol : public Data {
-  Symbol(std::string svalue) : Data(DataType::SYMBOL), svalue(svalue) { }
-  ~Symbol() { }
-  std::string svalue;
-};
+// Memory handling
 
-struct Number : public Data {
-  Number(int ivalue) : Data(DataType::NUMBER), ivalue(ivalue) { }
-  ~Number()  { }
-  int ivalue;
-};
-
-struct Cons : public Data {
-  Cons(Data *car, Data *cdr) : Data(DataType::CONS), car(car), cdr(cdr) { }
-  ~Cons() { dispose(car); dispose(cdr); }
-  Data *car, *cdr;
-};
-
-void dispose(Data *d) {
-  if (d != nil && d != bool_t && d != bool_f)
-    delete d;
+namespace {
+  struct Pool {
+    std::vector<Data*> data;
+    std::vector<std::string> strings;
+    Data *free_list;
+  } pool;
 }
 
+void initialize(size_t size) {
+  pool.data.resize(size);
+  pool.strings = { "NIL", "T", "F" };
+  pool.free_list = nil;
+  for (auto &d : pool.data) {
+    d = new Data(nil, pool.free_list);
+    pool.free_list = d;
+  }
+}
+
+void shutdown() {
+  for (auto d : pool.data)
+    delete d;
+  pool.data.clear();
+  pool.strings.clear();
+}
+
+// Interface implementation
+
 Data *symbol(std::string s) {
-  return new Symbol(s);
+  if (pool.free_list == nil)
+    throw std::runtime_error("out of memory");
+  auto d = pool.free_list;
+  pool.free_list = cdr(d);
+  d->type = DataType::SYMBOL;
+  auto iter = std::find(pool.strings.begin(), pool.strings.end(), s);
+  size_t index = iter - pool.strings.begin();
+  if (iter == pool.strings.end())
+    pool.strings.push_back(s);
+  d->svalue = index;
+  return d;
 }
 
 Data *number(int n) {
-  return new Number(n);
+  if (pool.free_list == nil)
+    throw std::runtime_error("out of memory");
+  auto d = pool.free_list;
+  pool.free_list = cdr(d);
+  d->type = DataType::NUMBER;
+  d->ivalue = n;
+  return d;
 }
 
 Data *cons(Data *a, Data *b) {
-  return new Cons(a, b);
+  if (pool.free_list == nil)
+    throw std::runtime_error("out of memory");
+  auto d = pool.free_list;
+  pool.free_list = cdr(d);
+  d->type = DataType::CONS;
+  d->cadr = { a, b };
+  return d;
 }
 
 bool issymbol(Data *d) {
@@ -56,24 +95,25 @@ bool iscons(Data *d) {
 }
 
 std::string svalue(Data *d) {
-  return dynamic_cast<Symbol*>(d)->svalue;
+  return pool.strings[d->svalue];
 }
 
 int ivalue(Data *d) {
-  return dynamic_cast<Number*>(d)->ivalue;
+  return d->ivalue;
 }
 
 Data *car(Data *d) {
-  return dynamic_cast<Cons*>(d)->car;
+  return d->cadr.first;
 }
 
 Data *cdr(Data *d) {
-  return dynamic_cast<Cons*>(d)->cdr;
+  return d->cadr.second;
 }
 
 void rplaca(Data *c, Data *d) {
-  dynamic_cast<Cons*>(c)->car = d;
+  c->cadr.first = d;
 }
 
-Symbol nil_symbol("NIL"), bool_t_symbol("T"), bool_f_symbol("F");
+Data nil_symbol(0), bool_t_symbol(1), bool_f_symbol(2);
+
 Data *nil = &nil_symbol, *bool_t = &bool_t_symbol, *bool_f = &bool_f_symbol;
