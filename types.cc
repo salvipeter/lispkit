@@ -15,7 +15,7 @@ struct Data {
   union {
     size_t svalue;
     int ivalue;
-    std::pair <Data *, Data *> cadr;
+    std::pair<Data *, Data *> cadr;
   };
 };
 
@@ -46,13 +46,24 @@ void shutdown() {
   pool.strings.clear();
 }
 
+static void gc() {
+}
+
+static Data *getNextCell() {
+  if (pool.free_list == nil) {
+    gc();
+    if (pool.free_list == nil)
+      throw std::runtime_error("out of memory");
+  }
+  auto d = pool.free_list;
+  pool.free_list = cdr(d);
+  return d;
+}
+
 // Interface implementation
 
 Data *symbol(std::string s) {
-  if (pool.free_list == nil)
-    throw std::runtime_error("out of memory");
-  auto d = pool.free_list;
-  pool.free_list = cdr(d);
+  auto d = getNextCell();
   d->type = DataType::SYMBOL;
   auto iter = std::find(pool.strings.begin(), pool.strings.end(), s);
   size_t index = iter - pool.strings.begin();
@@ -63,20 +74,14 @@ Data *symbol(std::string s) {
 }
 
 Data *number(int n) {
-  if (pool.free_list == nil)
-    throw std::runtime_error("out of memory");
-  auto d = pool.free_list;
-  pool.free_list = cdr(d);
+  auto d = getNextCell();
   d->type = DataType::NUMBER;
   d->ivalue = n;
   return d;
 }
 
 Data *cons(Data *a, Data *b) {
-  if (pool.free_list == nil)
-    throw std::runtime_error("out of memory");
-  auto d = pool.free_list;
-  pool.free_list = cdr(d);
+  auto d = getNextCell();
   d->type = DataType::CONS;
   d->cadr = { a, b };
   return d;
