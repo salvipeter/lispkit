@@ -9,7 +9,7 @@ release: CXXFLAGS += -O3
 release: lispkit
 
 lispkit: lispkit.o secd.o types.o
-	g++ -o $@ $^
+	$(CXX) -o $@ $^
 
 secd.o: secd.cc secd.hh
 
@@ -17,4 +17,4 @@ types.o: types.cc types.hh
 
 .PHONY: clean
 clean:
-	rm *.o lispkit
+	$(RM) *.o lispkit
