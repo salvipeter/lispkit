@@ -41,6 +41,7 @@ private:
   Data *s, *e, *c, *d;
   Data *w, *t, *f, *nil;
 
+  bool running;
   std::vector<Data *> data;
   std::vector<std::string> strings;
   Data *free_list;

@@ -6,14 +6,14 @@
 
 #define PRINT_MEMORY_INFO
 
-SECD::SECD(size_t memory_limit) {
+SECD::SECD(size_t memory_limit) : running(false) {
   strings = { "NIL", "T", "F" };
   nil = new Data(0); t = new Data(1); f = new Data(2);
   data.resize(memory_limit);
   free_list = nil;
-  for (auto &d : data) {
-    d = new Data(nil, free_list);
-    free_list = d;
+  for (auto &p : data) {
+    p = new Data(nil, free_list);
+    free_list = p;
   }
 }
 
@@ -21,8 +21,8 @@ SECD::~SECD() {
 #ifdef PRINT_MEMORY_INFO
   std::cout << data.size() - memory() << " cells still in use at exit." << std::endl;
 #endif
-  for (auto d : data)
-    delete d;
+  for (auto p : data)
+    delete p;
   delete f;
   delete t;
   delete nil;
@@ -140,8 +140,8 @@ void SECD::putexp(Data *e, std::ostream &os) const {
 
 Data *SECD::exec(Data *fn, Data *args) {
   s = cons(args, nil); e = nil; c = fn; d = nil;
-  bool stop = false;
-  while (!stop) {
+  running = true;
+  while (running) {
     switch (c->car()->ivalue()) {
     case 1:  // LD
       w = e;
@@ -254,7 +254,7 @@ Data *SECD::exec(Data *fn, Data *args) {
       c = c->cdr();
       break;
     case 21: // STOP
-      stop = true;
+      running = false;
       break;
     }
   }
@@ -263,50 +263,52 @@ Data *SECD::exec(Data *fn, Data *args) {
 
 Data *SECD::getNextCell() {
   if (free_list == nil) {
-    gc();
+    if (running) {              // Cannot garbage collect in the reading phase
+      gc();
 #ifdef PRINT_MEMORY_INFO
-    std::cout << "Garbage collected " << memory() << " cells." << std::endl;
+      std::cout << "Garbage collected " << memory() << " cells." << std::endl;
 #endif
+    }
     if (free_list == nil)
       throw std::runtime_error("out of memory");
   }
-  auto d = free_list;
-  free_list = d->cdr();
-  return d;
+  auto p = free_list;
+  free_list = p->cdr();
+  return p;
 }
 
 void SECD::gc() {
-  for (auto d : data)
-    d->unmark();
+  for (auto p : data)
+    p->unmark();
 
   s->mark(); e->mark(); c->mark(); d->mark();
   w->mark(); t->mark(); f->mark(); nil->mark();
 
-  for (auto d : data)
-    if (!d->ismarked()) {
-      d->setCons(nil, free_list);
-      free_list = d;
+  for (auto p : data)
+    if (!p->ismarked()) {
+      p->setCons(nil, free_list);
+      free_list = p;
     }
 }
 
 Data *SECD::symbol(std::string s) {
-  auto d = getNextCell();
+  auto p = getNextCell();
   auto iter = std::find(strings.begin(), strings.end(), s);
   size_t index = iter - strings.begin();
   if (iter == strings.end())
     strings.push_back(s);
-  d->setSymbol(index);
-  return d;
+  p->setSymbol(index);
+  return p;
 }
 
 Data *SECD::number(int n) {
-  auto d = getNextCell();
-  d->setNumber(n);
-  return d;
+  auto p = getNextCell();
+  p->setNumber(n);
+  return p;
 }
 
 Data *SECD::cons(Data *a, Data *b) {
-  auto d = getNextCell();
-  d->setCons(a, b);
-  return d;
+  auto p = getNextCell();
+  p->setCons(a, b);
+  return p;
 }
