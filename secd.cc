@@ -1,124 +1,312 @@
 #include "secd.hh"
+#include "types.hh"
 
-// Section 11.8
+#include <algorithm>
+#include <stdexcept>
 
-Data *exec(Data *fn, Data *args) {
-  Data *s = cons(args, nil), *e = nil, *c = fn, *d = nil, *w;
+#define PRINT_MEMORY_INFO
+
+SECD::SECD(size_t memory_limit) {
+  strings = { "NIL", "T", "F" };
+  nil = new Data(0); t = new Data(1); f = new Data(2);
+  data.resize(memory_limit);
+  free_list = nil;
+  for (auto &d : data) {
+    d = new Data(nil, free_list);
+    free_list = d;
+  }
+}
+
+SECD::~SECD() {
+#ifdef PRINT_MEMORY_INFO
+  std::cout << data.size() - memory() << " cells still in use at exit." << std::endl;
+#endif
+  for (auto d : data)
+    delete d;
+  delete f;
+  delete t;
+  delete nil;
+}
+
+size_t SECD::memory() const {
+  size_t counter = 0;
+  auto p = free_list;
+  while (p != nil) {
+    ++counter;
+    p = p->cdr();
+  }
+  return counter;
+}
+
+Data *SECD::getexp(std::istream &is) {
+  auto token = gettoken(is);
+  return getexp(token, is);
+}
+
+Data *SECD::getexp(const Token &token, std::istream &is) {
+  switch (token.type) {
+  case Token::TokenType::NUMERIC:
+    return number(std::atoi(token.value.c_str()));
+  case Token::TokenType::ALPHANUMERIC:
+    return symbol(token.value);
+  case Token::TokenType::DELIMITER:    // should be "("
+    return getexplist(is);
+  case Token::TokenType::ENDFILE:
+    throw std::runtime_error("premature end of file");
+  }
+  return nullptr;               // cannot reach this
+}
+
+SECD::Token SECD::gettoken(std::istream &is) {
+  is >> std::ws;
+  if (is.eof())
+    return { Token::TokenType::ENDFILE, "" };
+  char c;
+  is.get(c);
+  if (std::isdigit(c) || c == '-') {
+    std::string s(1, c);
+    while (!is.eof()) {
+      c = is.peek();
+      if (c == std::char_traits<char>::eof() || !std::isdigit(c))
+        break;
+      is.get(c);
+      s += c;
+    }
+    return { Token::TokenType::NUMERIC, s };
+  }
+  if (std::isalpha(c)) {
+    std::string s(1, c);
+    while (!is.eof()) {
+      c = is.peek();
+      if (c == std::char_traits<char>::eof() || !(std::isalpha(c) || std::isdigit(c)))
+        break;
+      is.get(c);
+      s += c;
+    }
+    return { Token::TokenType::ALPHANUMERIC, s };
+  }
+  return { Token::TokenType::DELIMITER, { c } };
+}
+
+Data *SECD::getexplist(std::istream &is) {
+  return getexplist(is, nullptr);
+}
+
+Data *SECD::getexplist(std::istream &is, Data *next_car) {
+  Data *car, *cdr;
+  if (next_car)
+    car = next_car;
+  else
+    car = getexp(is);
+  auto token = gettoken(is);
+  if (token.value == ".") {
+    cdr = getexp(is);
+    gettoken(is);               // read also the final ')'
+  }
+  else if (token.type == Token::TokenType::ENDFILE || token.value == ")")
+    cdr = nil;
+  else {
+    auto next = getexp(token, is);
+    cdr = getexplist(is, next);
+  }
+  return cons(car, cdr);
+}
+
+// There are only 3 cases when we do not want space before printing something:
+// - it is the first thing we print
+// - it is immediately after a '('
+// - it is a ')'
+void SECD::putexp(Data *e, std::ostream &os) const {
+  if (e->issymbol())
+    os << e->svalue();
+  else if (e->isnumber())
+    os << e->ivalue();
+  else {
+    os << '(';
+    auto p = e;
+    while (p->iscons()) {
+      putexp(p->car(), os);
+      p = p->cdr();
+      if (p->iscons())
+        os << ' ';
+    }
+    if (p != nil) {
+      os << " . ";
+      putexp(p, os);
+    }
+    os << ')';
+  }
+}
+
+Data *SECD::exec(Data *fn, Data *args) {
+  s = cons(args, nil); e = nil; c = fn; d = nil;
   bool stop = false;
   while (!stop) {
-    switch (ivalue(car(c))) {
+    switch (c->car()->ivalue()) {
     case 1:  // LD
       w = e;
-      for (int i = 1; i <= ivalue(car(car(cdr(c)))); ++i)
-        w = cdr(w);
-      w = car(w);
-      for (int i = 1; i <= ivalue(cdr(car(cdr(c)))); ++i)
-        w = cdr(w);
-      w = car(w);
+      for (int i = 1; i <= c->cdr()->car()->car()->ivalue(); ++i)
+        w = w->cdr();
+      w = w->car();
+      for (int i = 1; i <= c->cdr()->car()->cdr()->ivalue(); ++i)
+        w = w->cdr();
+      w = w->car();
       s = cons(w, s);
-      c = cdr(cdr(c));
+      c = c->cdr()->cdr();
       break;
     case 2:  // LDC
-      s = cons(car(cdr(c)), s);
-      c = cdr(cdr(c));
+      s = cons(c->cdr()->car(), s);
+      c = c->cdr()->cdr();
       break;
     case 3:  // LDF
-      s = cons(cons(car(cdr(c)), e), s);
-      c = cdr(cdr(c));
+      s = cons(cons(c->cdr()->car(), e), s);
+      c = c->cdr()->cdr();
       break;
     case 4:  // AP
-      d = cons(cdr(cdr(s)), cons(e, cons(cdr(c), d)));
-      e = cons(car(cdr(s)), cdr(car(s)));
-      c = car(car(s));
+      d = cons(s->cdr()->cdr(), cons(e, cons(c->cdr(), d)));
+      e = cons(s->cdr()->car(), s->car()->cdr());
+      c = s->car()->car();
       s = nil;
       break;
     case 5:  // RTN
-      s = cons(car(s), car(d));
-      e = car(cdr(d));
-      c = car(cdr(cdr(d)));
-      d = cdr(cdr(cdr(d)));
+      s = cons(s->car(), d->car());
+      e = d->cdr()->car();
+      c = d->cdr()->cdr()->car();
+      d = d->cdr()->cdr()->cdr();
       break;
     case 6:  // DUM
       e = cons(nil, e);
-      c = cdr(c);
+      c = c->cdr();
       break;
     case 7:  // RAP
-      d = cons(cdr(cdr(s)), cons(cdr(e), cons(cdr(c), d)));
-      e = cdr(car(s));
-      rplaca(e, car(cdr(s)));
-      c = car(car(s));
+      d = cons(s->cdr()->cdr(), cons(e->cdr(), cons(c->cdr(), d)));
+      e = s->car()->cdr();
+      e->rplaca(s->cdr()->car());
+      c = s->car()->car();
       s = nil;
       break;
     case 8:  // SEL
-      d = cons(cdr(cdr(cdr(c))), d);
-      if (svalue(car(s)) == "T")
-        c = car(cdr(c));
+      d = cons(c->cdr()->cdr()->cdr(), d);
+      if (s->car()->svalue() == 1) // "T"
+        c = c->cdr()->car();
       else
-        c = car(cdr(cdr(c)));
-      s = cdr(s);
+        c = c->cdr()->cdr()->car();
+      s = s->cdr();
       break;
     case 9:  // JOIN
-      c = car(d);
-      d = cdr(d);
+      c = d->car();
+      d = d->cdr();
       break;
     case 10: // CAR
-      s = cons(car(car(s)), cdr(s));
-      c = cdr(c);
+      s = cons(s->car()->car(), s->cdr());
+      c = c->cdr();
       break;
     case 11: // CDR
-      s = cons(cdr(car(s)), cdr(s));
-      c = cdr(c);
+      s = cons(s->car()->cdr(), s->cdr());
+      c = c->cdr();
       break;
     case 12: // ATOM
-      if (isnumber(car(s)) || issymbol(car(s)))
-        s = cons(bool_t, cdr(s));
+      if (s->car()->isnumber() || s->car()->issymbol())
+        s = cons(t, s->cdr());
       else
-        s = cons(bool_f, cdr(s));
-      c = cdr(c);
+        s = cons(f, s->cdr());
+      c = c->cdr();
       break;
     case 13: // CONS
-      s = cons(cons(car(s), car(cdr(s))), cdr(cdr(s)));
-      c = cdr(c);
+      s = cons(cons(s->car(), s->cdr()->car()), s->cdr()->cdr());
+      c = c->cdr();
       break;
     case 14: // EQ
-      if ((issymbol(car(s)) && issymbol(car(cdr(s))) && svalue(car(s)) == svalue(car(cdr(s)))) ||
-          (isnumber(car(s)) && isnumber(car(cdr(s))) && ivalue(car(s)) == ivalue(car(cdr(s)))))
-        s = cons(bool_t, cdr(cdr(s)));
+      if ((s->car()->issymbol() && s->cdr()->car()->issymbol() &&
+           s->car()->svalue() == s->cdr()->car()->svalue()) ||
+          (s->car()->isnumber() && s->cdr()->car()->isnumber() &&
+           s->car()->ivalue() == s->cdr()->car()->ivalue()))
+        s = cons(t, s->cdr()->cdr());
       else
-        s = cons(bool_f, cdr(cdr(s)));
-      c = cdr(c);
+        s = cons(f, s->cdr()->cdr());
+      c = c->cdr();
       break;
     case 15: // ADD
-      s = cons(number(ivalue(car(cdr(s))) + ivalue(car(s))), cdr(cdr(s)));
-      c = cdr(c);
+      s = cons(number(s->cdr()->car()->ivalue() + s->car()->ivalue()), s->cdr()->cdr());
+      c = c->cdr();
       break;
     case 16: // SUB
-      s = cons(number(ivalue(car(cdr(s))) - ivalue(car(s))), cdr(cdr(s)));
-      c = cdr(c);
+      s = cons(number(s->cdr()->car()->ivalue() - s->car()->ivalue()), s->cdr()->cdr());
+      c = c->cdr();
       break;
     case 17: // MUL
-      s = cons(number(ivalue(car(cdr(s))) * ivalue(car(s))), cdr(cdr(s)));
-      c = cdr(c);
+      s = cons(number(s->cdr()->car()->ivalue() * s->car()->ivalue()), s->cdr()->cdr());
+      c = c->cdr();
       break;
     case 18: // DIV
-      s = cons(number(ivalue(car(cdr(s))) / ivalue(car(s))), cdr(cdr(s)));
-      c = cdr(c);
+      s = cons(number(s->cdr()->car()->ivalue() / s->car()->ivalue()), s->cdr()->cdr());
+      c = c->cdr();
       break;
     case 19: // REM
-      s = cons(number(ivalue(car(cdr(s))) % ivalue(car(s))), cdr(cdr(s)));
-      c = cdr(c);
+      s = cons(number(s->cdr()->car()->ivalue() % s->car()->ivalue()), s->cdr()->cdr());
+      c = c->cdr();
       break;
     case 20: // LEQ
-      if (ivalue(car(cdr(s))) <= ivalue(car(s)))
-        s = cons(bool_t, cdr(cdr(s)));
+      if (s->cdr()->car()->ivalue() <= s->car()->ivalue())
+        s = cons(t, s->cdr()->cdr());
       else
-        s = cons(bool_f, cdr(cdr(s)));
-      c = cdr(c);
+        s = cons(f, s->cdr()->cdr());
+      c = c->cdr();
       break;
     case 21: // STOP
       stop = true;
       break;
     }
   }
-  return car(s);
+  return s->car();
+}
+
+Data *SECD::getNextCell() {
+  if (free_list == nil) {
+    gc();
+#ifdef PRINT_MEMORY_INFO
+    std::cout << "Garbage collected " << memory() << " cells." << std::endl;
+#endif
+    if (free_list == nil)
+      throw std::runtime_error("out of memory");
+  }
+  auto d = free_list;
+  free_list = d->cdr();
+  return d;
+}
+
+void SECD::gc() {
+  for (auto d : data)
+    d->unmark();
+
+  s->mark(); e->mark(); c->mark(); d->mark();
+  w->mark(); t->mark(); f->mark(); nil->mark();
+
+  for (auto d : data)
+    if (!d->ismarked()) {
+      d->setCons(nil, free_list);
+      free_list = d;
+    }
+}
+
+Data *SECD::symbol(std::string s) {
+  auto d = getNextCell();
+  auto iter = std::find(strings.begin(), strings.end(), s);
+  size_t index = iter - strings.begin();
+  if (iter == strings.end())
+    strings.push_back(s);
+  d->setSymbol(index);
+  return d;
+}
+
+Data *SECD::number(int n) {
+  auto d = getNextCell();
+  d->setNumber(n);
+  return d;
+}
+
+Data *SECD::cons(Data *a, Data *b) {
+  auto d = getNextCell();
+  d->setCons(a, b);
+  return d;
 }

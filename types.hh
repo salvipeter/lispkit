@@ -1,27 +1,41 @@
 #pragma once
 
-#include <string>
+#include <cstddef>
+#include <utility>
 
 // Section 11.1
 
-struct Data;
+class Data {
+public:
+  Data(size_t s);
+  Data(Data *a, Data *b);
+  ~Data();
 
-extern Data *nil;
-extern Data *bool_t, *bool_f; // Section 11.8
+  void setSymbol(size_t s);
+  size_t svalue() const;
 
-Data *symbol(std::string s);
-Data *number(int n);
-Data *cons(Data *a, Data *b);
+  void setNumber(int n);
+  int ivalue() const;
 
-bool issymbol(Data *d);
-bool isnumber(Data *d);
-bool iscons(Data *d);
+  void setCons(Data *a, Data *b);
+  Data *car() const;
+  Data *cdr() const;
+  void rplaca(Data *d);
 
-std::string svalue(Data *d);
-int ivalue(Data *d);
-Data *car(Data *d);
-Data *cdr(Data *d);
-void rplaca(Data *c, Data *d);
+  bool issymbol() const;
+  bool isnumber() const;
+  bool iscons() const;
 
-void initialize(size_t size);
-void shutdown();
+  void mark();
+  void unmark();
+  bool ismarked() const;
+
+private:
+  enum class DataType { SYMBOL, NUMBER, CONS } type;
+  bool marked;
+  union {
+    size_t str_index;
+    int number;
+    std::pair<Data *, Data *> cadr;
+  };
+};
