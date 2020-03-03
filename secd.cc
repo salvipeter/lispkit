@@ -4,8 +4,6 @@
 #include <algorithm>
 #include <stdexcept>
 
-#define PRINT_MEMORY_INFO
-
 SECD::SECD(size_t memory_limit) : running(false) {
   strings = { "NIL", "T", "F" };
   nil = new Data(0); t = new Data(1); f = new Data(2);
@@ -19,7 +17,7 @@ SECD::SECD(size_t memory_limit) : running(false) {
 
 SECD::~SECD() {
 #ifdef PRINT_MEMORY_INFO
-  std::cout << data.size() - memory() << " cells still in use at exit." << std::endl;
+  std::cerr << data.size() - memory() << " cells still in use at exit." << std::endl;
 #endif
   for (auto p : data)
     delete p;
@@ -118,7 +116,7 @@ Data *SECD::getexplist(std::istream &is, Data *next_car) {
 // - it is a ')'
 void SECD::putexp(Data *e, std::ostream &os) const {
   if (e->issymbol())
-    os << e->svalue();
+    os << strings[e->svalue()];
   else if (e->isnumber())
     os << e->ivalue();
   else {
@@ -138,6 +136,11 @@ void SECD::putexp(Data *e, std::ostream &os) const {
   }
 }
 
+// Note that calls of the type
+//   cons(cons(...)) or cons(number(...))
+// are not valid, because garbage collection may be invoked
+// after the inner but before the outer call,
+// and the inner expression would be garbage collected.
 Data *SECD::exec(Data *fn, Data *args) {
   s = cons(args, nil); e = nil; c = fn; d = nil;
   running = true;
@@ -159,11 +162,14 @@ Data *SECD::exec(Data *fn, Data *args) {
       c = c->cdr()->cdr();
       break;
     case 3:  // LDF
-      s = cons(cons(c->cdr()->car(), e), s);
+      w = cons(c->cdr()->car(), e);
+      s = cons(w, s);
       c = c->cdr()->cdr();
       break;
     case 4:  // AP
-      d = cons(s->cdr()->cdr(), cons(e, cons(c->cdr(), d)));
+      w = cons(c->cdr(), d);
+      w = cons(e, w);
+      d = cons(s->cdr()->cdr(), w);
       e = cons(s->cdr()->car(), s->car()->cdr());
       c = s->car()->car();
       s = nil;
@@ -179,7 +185,9 @@ Data *SECD::exec(Data *fn, Data *args) {
       c = c->cdr();
       break;
     case 7:  // RAP
-      d = cons(s->cdr()->cdr(), cons(e->cdr(), cons(c->cdr(), d)));
+      w = cons(c->cdr(), d);
+      w = cons(e->cdr(), w);
+      d = cons(s->cdr()->cdr(), w);
       e = s->car()->cdr();
       e->rplaca(s->cdr()->car());
       c = s->car()->car();
@@ -213,7 +221,8 @@ Data *SECD::exec(Data *fn, Data *args) {
       c = c->cdr();
       break;
     case 13: // CONS
-      s = cons(cons(s->car(), s->cdr()->car()), s->cdr()->cdr());
+      w = cons(s->car(), s->cdr()->car());
+      s = cons(w, s->cdr()->cdr());
       c = c->cdr();
       break;
     case 14: // EQ
@@ -227,23 +236,28 @@ Data *SECD::exec(Data *fn, Data *args) {
       c = c->cdr();
       break;
     case 15: // ADD
-      s = cons(number(s->cdr()->car()->ivalue() + s->car()->ivalue()), s->cdr()->cdr());
+      w = number(s->cdr()->car()->ivalue() + s->car()->ivalue());
+      s = cons(w, s->cdr()->cdr());
       c = c->cdr();
       break;
     case 16: // SUB
-      s = cons(number(s->cdr()->car()->ivalue() - s->car()->ivalue()), s->cdr()->cdr());
+      w = number(s->cdr()->car()->ivalue() - s->car()->ivalue());
+      s = cons(w, s->cdr()->cdr());
       c = c->cdr();
       break;
     case 17: // MUL
-      s = cons(number(s->cdr()->car()->ivalue() * s->car()->ivalue()), s->cdr()->cdr());
+      w = number(s->cdr()->car()->ivalue() * s->car()->ivalue());
+      s = cons(w, s->cdr()->cdr());
       c = c->cdr();
       break;
     case 18: // DIV
-      s = cons(number(s->cdr()->car()->ivalue() / s->car()->ivalue()), s->cdr()->cdr());
+      w = number(s->cdr()->car()->ivalue() / s->car()->ivalue());
+      s = cons(w, s->cdr()->cdr());
       c = c->cdr();
       break;
     case 19: // REM
-      s = cons(number(s->cdr()->car()->ivalue() % s->car()->ivalue()), s->cdr()->cdr());
+      w = number(s->cdr()->car()->ivalue() % s->car()->ivalue());
+      s = cons(w, s->cdr()->cdr());
       c = c->cdr();
       break;
     case 20: // LEQ
@@ -266,7 +280,7 @@ Data *SECD::getNextCell() {
     if (running) {              // Cannot garbage collect in the reading phase
       gc();
 #ifdef PRINT_MEMORY_INFO
-      std::cout << "Garbage collected " << memory() << " cells." << std::endl;
+      std::cerr << "Garbage collected " << memory() << " cells." << std::endl;
 #endif
     }
     if (free_list == nil)

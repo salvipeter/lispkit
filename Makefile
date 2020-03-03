@@ -1,6 +1,12 @@
 all: lispkit
 
-CXXFLAGS=-Wall -g -std=c++17 -pedantic
+CXXFLAGS=-Wall -std=c++17 -pedantic
+
+debug: CXXFLAGS += -g -DDEBUG -DPRINT_MEMORY_INFO
+debug: lispkit
+
+release: CXXFLAGS += -O3
+release: lispkit
 
 lispkit: lispkit.o secd.o types.o
 	g++ -o $@ $^

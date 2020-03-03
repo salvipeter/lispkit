@@ -26,6 +26,7 @@ public:
   bool isnumber() const;
   bool iscons() const;
 
+  // Garbage collection mark handling                    Section 12.2
   void mark();
   void unmark();
   bool ismarked() const;
